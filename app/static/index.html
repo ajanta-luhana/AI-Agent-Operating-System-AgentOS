@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AgentOS</title>
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#14202b;--mute:#5d6b78;--line:#d3dae1;--ok:#0f7b6c;--run:#b7791f;--bad:#c4352b;--wash:#f6f8fa;box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root{--bg:#0e151b;--card:#16212a;--ink:#e6edf3;--mute:#8d9cab;--line:#2a3945;--ok:#3fbfa8;--run:#e0a43b;--bad:#ef6a5e;--wash:#101a21}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 60px}h1{font-size:22px;margin:0}h2{font-size:15px;margin:0 0 10px}
+.top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.tag{font-size:12px;border:1px solid var(--mute);color:var(--mute);border-radius:20px;padding:2px 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+textarea,input[type=text]{width:100%;font:inherit;color:inherit;background:var(--wash);border:1px solid var(--line);border-radius:6px;padding:10px}
+textarea{min-height:64px;resize:vertical}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:var(--bg);padding:7px 16px}
+button.alt{background:transparent;color:var(--ink);border-color:var(--line)}button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--ok);outline-offset:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:720px){.grid{grid-template-columns:1fr}}
+svg text{fill:var(--ink);font:12px system-ui,sans-serif}
+.node rect{fill:var(--wash);stroke:var(--line);stroke-width:1.5;transition:all .3s}
+.node.run rect{stroke:var(--run);fill:color-mix(in srgb,var(--run) 14%,var(--card))}
+.node.done rect{stroke:var(--ok);fill:color-mix(in srgb,var(--ok) 14%,var(--card))}
+.node.wait rect{stroke:var(--bad);stroke-dasharray:4 3}.node.bad rect{stroke:var(--bad);fill:color-mix(in srgb,var(--bad) 14%,var(--card))}
+.edge{stroke:var(--line);stroke-width:1.5;fill:none}
+#log{font:12.5px/1.55 ui-monospace,Consolas,monospace;height:300px;overflow:auto;background:var(--wash);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+#log div{white-space:pre-wrap}.k-ok{color:var(--ok)}.k-run{color:var(--run)}.k-bad{color:var(--bad)}.k-m{color:var(--mute)}
+.task{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.task:first-of-type{border-top:0}
+.who{font:12px ui-monospace,Consolas,monospace;min-width:96px;color:var(--mute)}.hide{display:none}
+#rep h1{font-size:20px}#rep h2{font-size:17px;margin:16px 0 6px}#rep h3{font-size:15px}#rep img{max-width:100%;border:1px solid var(--line);border-radius:6px;margin:6px 0}
+#rep table{width:100%;border-collapse:collapse;font-size:13.5px}#rep th,#rep td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+#rep blockquote{margin:8px 0;padding:6px 12px;border-left:3px solid var(--run);background:var(--wash)}
+#rep code{font:12.5px ui-monospace,Consolas,monospace;background:var(--wash);padding:1px 4px;border-radius:4px}.scroll{overflow-x:auto}
+</style></head><body><main>
+<div class="top"><h1>AgentOS</h1><span class="tag" id="st">idle</span><span class="tag" id="rid"></span></div>
+
+<section class="card" id="s1"><h2>1. Give a goal</h2>
+<textarea id="goal">Analyze my company sales data, find anomalies, research competitors and prepare a report.</textarea>
+<div class="row"><input type="file" id="file" accept=".csv"><button id="run">Run agents</button><button class="alt hide" id="new">New run</button></div>
+<div class="k-bad" id="err" style="margin-top:8px"></div></section>
+
+<section class="card hide" id="approve"><h2>2. Approve the plan</h2><div id="tasks"></div>
+<div class="row"><button id="yes">Approve plan</button><button class="alt" id="no">Reject with feedback</button>
+<input type="text" id="fb" placeholder="Feedback, e.g. add a pricing comparison" style="flex:1;min-width:160px;width:auto"></div></section>
+
+<div class="grid"><section class="card"><h2>Agent graph</h2>
+<svg viewBox="0 0 440 330" width="100%" role="img" aria-label="Agent graph">
+<path class="edge" d="M220 40V62M220 100V122M220 150H90V172M220 150H350V172M90 210V240H220V256M350 210V240H220V256M220 294V300"/>
+<g class="node" id="n-planner"><rect x="150" y="10" width="140" height="30" rx="6"/><text x="220" y="30" text-anchor="middle">Planner</text></g>
+<g class="node" id="n-approve_plan"><rect x="150" y="62" width="140" height="38" rx="6"/><text x="220" y="85" text-anchor="middle">Plan approval</text></g>
+<g class="node" id="n-analyst"><rect x="20" y="172" width="140" height="38" rx="6"/><text x="90" y="189" text-anchor="middle">Analyst</text><text x="90" y="203" text-anchor="middle" style="fill:var(--mute);font-size:11px">sandboxed Python</text></g>
+<g class="node" id="n-researcher"><rect x="280" y="172" width="140" height="38" rx="6"/><text x="350" y="189" text-anchor="middle">Researcher</text><text x="350" y="203" text-anchor="middle" style="fill:var(--mute);font-size:11px">web + RAG</text></g>
+<g class="node" id="n-verifier"><rect x="150" y="256" width="140" height="38" rx="6"/><text x="220" y="272" text-anchor="middle">Verifier</text><text x="220" y="286" text-anchor="middle" style="fill:var(--mute);font-size:11px">fail → reflector → retry</text></g>
+<g class="node" id="n-reporter"><rect x="150" y="300" width="140" height="26" rx="6"/><text x="220" y="318" text-anchor="middle">Reporter</text></g></svg></section>
+<section class="card"><h2>Live events</h2><div id="log" aria-live="polite"><div class="k-m">Nothing running yet.</div></div></section></div>
+
+<section class="card hide" id="repcard"><h2>Final report</h2><div id="rep"></div></section>
+
+<script>
+const $=id=>document.getElementById(id);
+let RID=null,es=null,cnt={},waiting=false,done=false;
+const setNode=(n,s)=>{const e=$('n-'+n);if(e)e.setAttribute('class','node '+s)};
+const log=(t,c='')=>{const d=document.createElement('div');d.className=c;d.textContent=t;$('log').appendChild(d);$('log').scrollTop=1e9};
+const api=async(p,o)=>{const r=await fetch(p,o);if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));return r};
+
+function md(t,rid){
+ const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ const inl=s=>esc(s).replace(/!\[([^\]]*)\]\(([^)]+)\)/g,(m,a,u)=>`<img alt="${a}" src="${u.startsWith('files/')?'/runs/'+rid+'/'+u:u}">`)
+  .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+  .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+ const L=t.split('\n'),o=[];let i=0;
+ while(i<L.length){const l=L[i];let m;
+  if(m=l.match(/^(#{1,4})\s+(.*)/)){o.push(`<h${m[1].length}>${inl(m[2])}</h${m[1].length}>`);i++}
+  else if(l.startsWith('|')){const rows=[];while(i<L.length&&L[i].startsWith('|')){rows.push(L[i]);i++}
+   const cells=r=>r.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+   const body=rows.filter(r=>!/^\|[\s:|-]+\|?$/.test(r)).map((r,k)=>'<tr>'+cells(r).map(c=>k?`<td>${inl(c)}</td>`:`<th>${inl(c)}</th>`).join('')+'</tr>');
+   o.push('<div class="scroll"><table>'+body.join('')+'</table></div>')}
+  else if(/^\s*[-*]\s+/.test(l)){const it=[];while(i<L.length&&/^\s*[-*]\s+/.test(L[i])){it.push('<li>'+inl(L[i].replace(/^\s*[-*]\s+/,''))+'</li>');i++}o.push('<ul>'+it.join('')+'</ul>')}
+  else if(l.startsWith('>')){const q=[];while(i<L.length&&L[i].startsWith('>')){q.push(inl(L[i].replace(/^>\s?/,'')));i++}o.push('<blockquote>'+q.join('<br>')+'</blockquote>')}
+  else if(!l.trim())i++;
+  else{const p=[];while(i<L.length&&L[i].trim()&&!/^(#|\||>|\s*[-*]\s)/.test(L[i])){p.push(inl(L[i]));i++}o.push('<p>'+p.join(' ')+'</p>')}}
+ return o.join('')}
+
+function apply(e){
+ if(e.node==='run'){if(e.payload&&e.payload.status)status(e.payload.status);return}
+ const c=cnt[e.node]=cnt[e.node]||{s:0,e:0};
+ if(e.kind==='start')c.s++;else c.e++;
+ const tok=e.payload&&e.payload.completion_tokens!=null?` · ${e.payload.prompt_tokens}+${e.payload.completion_tokens} tokens`:'';
+ const ms=e.latency_ms!=null?` · ${(e.latency_ms/1000).toFixed(1)}s`:'';
+ log(`${e.node}: ${e.kind}${ms}${tok}`,e.kind==='end'?'k-ok':e.kind==='error'?'k-bad':'k-run');
+ if(e.kind==='error')log('  '+(e.payload.error||''),'k-bad');
+ if(e.node==='approve_plan')setNode('approve_plan',e.kind==='end'?'done':waiting?'wait':'run');
+ else setNode(e.node,e.kind==='error'?'bad':c.s>c.e?'run':'done')}
+
+async function status(s){
+ $('st').textContent=s;log('status → '+s,s==='failed'?'k-bad':'k-m');
+ if(s==='awaiting_approval'){waiting=true;setNode('approve_plan','wait');
+  const r=await (await api('/runs/'+RID)).json();
+  $('tasks').innerHTML=(r.plan||[]).map((t,i)=>`<div class="task"><span class="who">t${i+1} · ${t.agent}</span><span></span></div>`).join('');
+  [...$('tasks').querySelectorAll('.task span:last-child')].forEach((el,i)=>el.textContent=r.plan[i].description);
+  $('approve').classList.remove('hide')}
+ else{waiting=false;$('approve').classList.add('hide')}
+ if(s==='completed'){done=true;if(es)es.close();
+  const t=await (await api('/runs/'+RID+'/report')).text();$('rep').innerHTML=md(t,RID);$('repcard').classList.remove('hide');$('repcard').scrollIntoView({behavior:'smooth'})}
+ if(s==='failed'){done=true;if(es)es.close();
+  const r=await (await api('/runs/'+RID)).json();$('err').textContent='Run failed: '+(r.error||'see worker logs: docker compose logs worker --tail 50')}
+ if(done)$('run').disabled=false}
+
+function watch(id){
+ RID=id;cnt={};done=false;waiting=false;location.hash=id;$('rid').textContent='run '+id;
+ $('log').innerHTML='';['planner','approve_plan','analyst','researcher','verifier','reporter'].forEach(n=>setNode(n,''));
+ $('repcard').classList.add('hide');$('approve').classList.add('hide');$('new').classList.remove('hide');$('run').disabled=true;
+ if(es)es.close();es=new EventSource('/runs/'+id+'/stream');
+ es.onmessage=m=>apply(JSON.parse(m.data));
+ es.onerror=()=>{if(done)es.close()}}
+
+$('run').onclick=async()=>{
+ $('err').textContent='';const fd=new FormData();fd.append('goal',$('goal').value.trim());
+ if($('file').files[0])fd.append('file',$('file').files[0]);
+ if(!fd.get('goal'))return;
+ try{const r=await (await api('/goals',{method:'POST',body:fd})).json();watch(r.run_id)}catch(e){$('err').textContent=e.message}};
+const decide=async d=>{try{await api('/runs/'+RID+'/approve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(d)});
+ $('approve').classList.add('hide');waiting=false;log('you: '+(d.approved?'approved the plan':'rejected: '+d.feedback),'k-m')}catch(e){$('err').textContent=e.message}};
+$('yes').onclick=()=>decide({approved:true});
+$('no').onclick=()=>{const f=$('fb').value.trim();if(!f){$('fb').focus();return}$('fb').value='';decide({approved:false,feedback:f})};
+$('new').onclick=()=>{if(es)es.close();location.hash='';location.reload()};
+if(location.hash.length>1)watch(location.hash.slice(1));
+</script></main></body></html>

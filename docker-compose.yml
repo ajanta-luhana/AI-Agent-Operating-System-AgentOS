@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: agentos
+      POSTGRES_PASSWORD: agentos
+      POSTGRES_DB: agentos
+    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: ["5434:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentos"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes: [ollama:/root/.ollama]
+    ports: ["11434:11434"]
+    # GPU (NVIDIA): uncomment
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+
+  ollama-init:      # one-time model pull
+    image: ollama/ollama:latest
+    depends_on: [ollama]
+    environment: { OLLAMA_HOST: "ollama:11434" }
+    entrypoint: ["/bin/sh", "-c", "ollama pull ${CHAT_MODEL:-qwen2.5:14b-instruct} && ollama pull ${CODE_MODEL:-qwen2.5-coder:14b} && ollama pull ${EMBED_MODEL:-nomic-embed-text}"]
+    restart: "no"
+
+  sandbox-image:    # only builds the image: docker compose build sandbox-image
+    build: ./sandbox
+    image: agentos-sandbox:latest
+    profiles: ["build"]
+
+  api:
+    build: .
+    env_file: .env
+    ports: ["8010:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+    volumes: ["${HOST_RUNS_DIR}:/app/runs"]
+
+  worker:
+    build: .
+    command: python -m app.worker
+    env_file: .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+    volumes:
+      - "${HOST_RUNS_DIR}:/app/runs"
+      # Worker launches sandbox containers via the host docker daemon.
+      # NOTE: docker.sock = root-equivalent. Use rootless docker / sysbox / gVisor in production.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:
+  ollama:
